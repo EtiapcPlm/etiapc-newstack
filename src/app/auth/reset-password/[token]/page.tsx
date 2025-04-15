@@ -1,23 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
-import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 import Image from "next/image";
 
-export default function LoginPage() {
+export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
-  
+  const params = useParams();
+
   const [formData, setFormData] = useState({
-    email: "",
     password: "",
+    confirmPassword: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,23 +31,44 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Las contraseñas no coinciden");
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const result = await signIn("credentials", {
-        email: formData.email,
-        password: formData.password,
-        redirect: false,
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token: params.token,
+          password: formData.password,
+        }),
       });
 
-      if (result?.error) {
-        setError(result.error);
-        return;
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Error al restablecer la contraseña");
       }
 
-      router.push("/dashboard");
+      router.push("/auth/login?message=Contraseña actualizada exitosamente");
     } catch (err) {
-      setError("Error al iniciar sesión");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Error al restablecer la contraseña"
+      );
     } finally {
       setLoading(false);
     }
@@ -91,13 +112,10 @@ export default function LoginPage() {
         <div className="flex flex-col justify-center p-6 lg:p-10">
           <div className="mb-8">
             <h1 className="mb-2 text-3xl font-bold text-white">
-              Iniciar sesión
+              Restablecer contraseña
             </h1>
             <p className="text-sm text-slate-400">
-              ¿No tienes una cuenta?{" "}
-              <Link href="/auth/register" className="text-indigo-400 hover:underline">
-                Regístrate
-              </Link>
+              Ingresa tu nueva contraseña para actualizar tu cuenta.
             </p>
           </div>
 
@@ -108,21 +126,11 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              name="email"
-              type="email"
-              placeholder="Correo electrónico"
-              required
-              value={formData.email}
-              onChange={handleChange}
-              className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
-            />
-
             <div className="relative">
               <Input
                 name="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Contraseña"
+                placeholder="Nueva contraseña"
                 required
                 value={formData.password}
                 onChange={handleChange}
@@ -141,13 +149,27 @@ export default function LoginPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between">
-              <Link
-                href="/auth/forgot-password"
-                className="text-sm text-indigo-400 hover:underline"
+            <div className="relative">
+              <Input
+                name="confirmPassword"
+                type={showPassword ? "text" : "password"}
+                placeholder="Confirmar nueva contraseña"
+                required
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className="border-slate-700 bg-slate-800 pr-10 text-white placeholder:text-slate-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
               >
-                ¿Olvidaste tu contraseña?
-              </Link>
+                {showPassword ? (
+                  <EyeOffIcon className="h-5 w-5" />
+                ) : (
+                  <EyeIcon className="h-5 w-5" />
+                )}
+              </button>
             </div>
 
             <Button
@@ -155,34 +177,18 @@ export default function LoginPage() {
               className="mt-6 w-full bg-azul-oscuro py-6 text-white hover:bg-azul-oscuro/70"
               disabled={loading}
             >
-              {loading ? "Iniciando sesión..." : "Iniciar sesión"}
+              {loading ? "Actualizando..." : "Actualizar contraseña"}
             </Button>
-          </form>
 
-          <div className="mt-6 text-center text-sm text-slate-400">
-            O continuar con
-          </div>
-
-          <div className="mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-              className="w-full border-azul-oscuro bg-azul-principal text-white hover:bg-azul-principal/80"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="mr-2 h-5 w-5"
-                aria-hidden="true"
+            <div className="text-center">
+              <Link
+                href="/auth/login"
+                className="text-sm text-indigo-400 hover:underline"
               >
-                <path
-                  d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
-                  fill="currentColor"
-                />
-              </svg>
-              Continuar con Google
-            </Button>
-          </div>
+                Volver al inicio de sesión
+              </Link>
+            </div>
+          </form>
         </div>
       </div>
     </div>

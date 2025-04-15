@@ -8,13 +8,22 @@ export async function POST(request: Request) {
     await connectDB();
     const { token, password } = await request.json();
 
+    // Validar datos
     if (!token || !password) {
       return NextResponse.json(
-        { message: "Token y contraseña son requeridos" },
+        { message: "Todos los campos son requeridos" },
         { status: 400 }
       );
     }
 
+    if (password.length < 6) {
+      return NextResponse.json(
+        { message: "La contraseña debe tener al menos 6 caracteres" },
+        { status: 400 }
+      );
+    }
+
+    // Buscar usuario con token válido
     const user = await User.findOne({
       resetPasswordToken: token,
       resetPasswordExpires: { $gt: Date.now() },
@@ -27,10 +36,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Hash nueva contraseña
+    // Hash de la nueva contraseña
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Actualizar contraseña y limpiar tokens
+    // Actualizar usuario
     user.password = hashedPassword;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
@@ -43,7 +52,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error en reset-password:", error);
     return NextResponse.json(
-      { message: "Ocurrió un error al restablecer la contraseña" },
+      { message: "Error al restablecer la contraseña" },
       { status: 500 }
     );
   }
